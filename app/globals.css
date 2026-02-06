@@ -1,26 +1,131 @@
 @import "tailwindcss";
 
+/* Theme tokens */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+    --bg: 255 255 255;
+    --fg: 17 24 39; /* slate-900 */
+    --muted: 107 114 128; /* gray-500 */
+    --card: 255 255 255;
+    --border: 229 231 235; /* gray-200 */
+    --ring: 59 130 246; /* blue-500 */
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+    :root {
+        --bg: 10 10 10;
+        --fg: 237 237 237;
+        --muted: 156 163 175; /* gray-400 */
+        --card: 17 24 39; /* slate-900-ish */
+        --border: 55 65 81; /* gray-700 */
+        --ring: 96 165 250; /* blue-400 */
+    }
+}
+
+/* Base */
+html,
+body {
+    height: 100%;
+    margin: auto;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        Segoe UI,
+        Roboto,
+        Helvetica,
+        Arial,
+        "Apple Color Emoji",
+        "Segoe UI Emoji";
+}
+
+/* Nice text rendering */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* App background gradient */
+.app-shell {
+    min-height: 100vh;
+}
+
+/* Reusable “card” */
+.ui-card {
+    background: rgb(var(--card));
+    border: 1px solid rgb(var(--border));
+    border-radius: 16px;
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.06),
+        0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Inputs */
+.ui-input,
+.ui-select {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid rgb(var(--border));
+    background: rgba(255, 255, 255, 0.7);
+    padding: 10px 12px;
+    outline: none;
+    transition:
+        box-shadow 0.15s,
+        border-color 0.15s,
+        background 0.15s;
+}
+
+@media (prefers-color-scheme: dark) {
+    .ui-input,
+    .ui-select {
+        background: rgba(17, 24, 39, 0.6);
+    }
+}
+
+.ui-input:focus,
+.ui-select:focus {
+    border-color: rgba(var(--ring), 0.8);
+    box-shadow: 0 0 0 4px rgba(var(--ring), 0.18);
+}
+
+/* Buttons */
+.ui-button {
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-weight: 600;
+    transition:
+        transform 0.05s,
+        filter 0.15s,
+        box-shadow 0.15s;
+}
+
+.ui-button:active {
+    transform: translateY(1px);
+}
+
+.ui-button-primary {
+    color: white;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+}
+
+.ui-button-primary:hover {
+    filter: brightness(1.03);
+}
+
+/* Links */
+.ui-link {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.ui-link:hover {
+    text-decoration: underline;
+}
+
+/* Subtle helper text */
+.ui-muted {
+    color: rgb(var(--muted));
 }
