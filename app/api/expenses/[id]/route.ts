@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
+
 import { dbConnect } from "@/lib/mongodb";
+import { getTokenUser } from "@/lib/auth";
+
 import User from "@/models/User";
 import Expense from "@/models/Expenses";
 import Budget from "@/models/Budget";
-import { getTokenUser } from "@/lib/auth";
-import mongoose from "mongoose";
 
 /* ---------------------------- PATCH: edit amount --------------------------- */
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }, // ✅ Next 16 expects Promise
+) {
     try {
         await dbConnect();
 
-        const { id } = await params; // ✅ unwrap
+        const { id } = await params; // ✅ unwrap params
         const expenseId = id;
 
         const tokenUser = getTokenUser(req);
@@ -29,7 +34,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
         // ✅ Permission
         if (dbUser.role === "operator") {
-            if (!dbUser.department_id) return NextResponse.json({ error: "No department assigned" }, { status: 400 });
+            if (!dbUser.department_id) {
+                return NextResponse.json({ error: "No department assigned" }, { status: 400 });
+            }
 
             const sameDept = String(expense.department) === String(dbUser.department_id);
             const isCreator = String(expense.createdBy) === String(dbUser._id);
@@ -65,7 +72,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
                     department: expense.department,
                     month: expense.month,
                     status: { $ne: "rejected" },
-                    _id: { $ne: new mongoose.Types.ObjectId(expenseId) },
+                    _id: { $ne: new mongoose.Types.ObjectId(expenseId) }, // exclude current
                 },
             },
             { $group: { _id: null, total: { $sum: "$amount" } } },
@@ -91,11 +98,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 /* ---------------------------- DELETE: delete expense --------------------------- */
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }, // ✅ Next 16 expects Promise
+) {
     try {
         await dbConnect();
 
-        const { id } = await params; // ✅ unwrap
+        const { id } = await params; // ✅ unwrap params
         const expenseId = id;
 
         const tokenUser = getTokenUser(req);
@@ -107,12 +117,15 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
         if (!mongoose.Types.ObjectId.isValid(expenseId)) {
             return NextResponse.json({ error: "Invalid expense id" }, { status: 400 });
         }
+
         const expense = await Expense.findById(expenseId);
         if (!expense) return NextResponse.json({ error: "Expense not found" }, { status: 404 });
 
         // ✅ Permission
         if (dbUser.role === "operator") {
-            if (!dbUser.department_id) return NextResponse.json({ error: "No department assigned" }, { status: 400 });
+            if (!dbUser.department_id) {
+                return NextResponse.json({ error: "No department assigned" }, { status: 400 });
+            }
 
             const sameDept = String(expense.department) === String(dbUser.department_id);
             const isCreator = String(expense.createdBy) === String(dbUser._id);

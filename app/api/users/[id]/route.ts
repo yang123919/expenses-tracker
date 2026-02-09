@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbConnect } from "@/lib/mongodb";
-import User from "@/models/User";
 import mongoose from "mongoose";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+import { dbConnect } from "@/lib/mongodb";
+import User from "@/models/User";
+
+/* ---------------------------- GET: get user by id --------------------------- */
+export async function GET(
+    _req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }, // ✅ Next 16 expects Promise
+) {
     await dbConnect();
 
-    const id = params.id;
+    const { id } = await params; // ✅ unwrap
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
     }
@@ -19,11 +25,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json(user);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+/* --------------------------- DELETE: delete user by id ---------------------- */
+export async function DELETE(
+    _req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }, // ✅ Next 16 expects Promise
+) {
     try {
         await dbConnect();
 
-        const { id } = await params; 
+        const { id } = await params; // ✅ unwrap
         console.log("DELETE PARAM id:", id);
 
         if (!mongoose.isValidObjectId(id)) {
@@ -33,10 +43,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const user = await User.findById(id);
         if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
+        // ✅ prevent deleting last admin
         if (user.role === "admin") {
             const admins = await User.countDocuments({ role: "admin" });
             if (admins <= 1) {
-                return NextResponse.json({ error: "Cannot delete yourself" }, { status: 403 });
+                return NextResponse.json({ error: "Cannot delete the last admin" }, { status: 403 });
             }
         }
 
