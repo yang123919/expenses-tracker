@@ -10,7 +10,7 @@ export default function Sidebar({ role, drawerOpen, onClose }: { role: Role; dra
     const pathname = usePathname();
     const router = useRouter();
     const logout = async () => {
-        await fetch("api/logout", {
+        await fetch("/api/logout", {
             method: "POST",
             credentials: "include",
         });
@@ -42,14 +42,12 @@ export default function Sidebar({ role, drawerOpen, onClose }: { role: Role; dra
 
     return (
         <>
-            {/* ✅ Desktop sidebar */}
             <aside className="hidden md:flex md:flex-col md:w-64 bg-gray-900 text-white sticky top-0 h-screen">
                 <div className="p-4 border-b border-white/10 font-bold">Expense Tracker</div>
                 <Nav />
                 <button onClick={logout}>Log Out</button>
             </aside>
 
-            {/* ✅ Mobile drawer */}
             {drawerOpen && (
                 <div className="md:hidden fixed inset-0 z-50">
                     <div className="absolute inset-0 bg-black/50" onClick={onClose} />

@@ -18,7 +18,6 @@ type User = {
 
 type Department = { _id: string; name: string };
 type Budget = { amount: number };
-
 type Category = { _id: string; name: string };
 
 type Expense = {
@@ -51,11 +50,20 @@ export default function DepartmentPage() {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // add expense form
     const [expTitle, setExpTitle] = useState("");
     const [expAmount, setExpAmount] = useState("");
     const [expCategoryId, setExpCategoryId] = useState("");
     const [actionError, setActionError] = useState("");
+
+    const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+    const [editingAmount, setEditingAmount] = useState("");
+
+    const canEditOrDeleteExpense = (e: Expense) => {
+        if (user?.role === "operator") return e.status === "pending";
+        if (user?.role === "admin") return true;
+
+        return false;
+    };
 
     const month = new Date().toISOString().slice(0, 7); // YYYY-MM
 
@@ -67,6 +75,8 @@ export default function DepartmentPage() {
     const canEditBudget = user?.role !== "operator";
     const canManageCategories = user?.role === "admin" || user?.role === "finance";
     const canAddExpense = user?.role === "operator";
+
+    const rm = (n: number) => new Intl.NumberFormat("en-MY", { maximumFractionDigits: 0 }).format(n);
 
     const loadAll = async () => {
         if (!id) return;
@@ -100,7 +110,6 @@ export default function DepartmentPage() {
             setExpenses(expenseData);
             setCategories(catsData);
 
-            // default category for expense form
             if (catsData?.length && !expCategoryId) setExpCategoryId(catsData[0]._id);
         } catch (err: any) {
             console.error(err);
@@ -112,7 +121,6 @@ export default function DepartmentPage() {
 
     useEffect(() => {
         loadAll();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, month]);
 
     const totalExpenses = useMemo(() => {
@@ -120,7 +128,7 @@ export default function DepartmentPage() {
     }, [expenses]);
 
     const groupedExpenses = useMemo(() => {
-        return expenses.reduce<Record<string, Expense[]>>((acc, e) => {
+        return expenses.reduce<Record<string, Expense[]>>((acc, e) => {//reduce is loop through every expenses when it changes
             acc[e.category.name] = acc[e.category.name] || [];
             acc[e.category.name].push(e);
             return acc;
@@ -132,7 +140,7 @@ export default function DepartmentPage() {
         if (!budgetInput) return;
 
         const res = await fetch("/api/budgets", {
-            method: "POST",
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
@@ -238,169 +246,295 @@ export default function DepartmentPage() {
         setExpAmount("");
         await loadAll();
     };
+    const saveExpenseAmount = async (expenseId: string) => {
+        setActionError("");
+
+        const amt = Number(editingAmount);
+        if (!editingAmount || Number.isNaN(amt) || amt <= 0) {
+            setActionError("Amount must be a valid number");
+            return;
+        }
+
+        const res = await fetch(`/api/expenses/${expenseId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ amount: amt }),
+        });
+
+        const text = await res.text();
+        const data = text ? JSON.parse(text) : {};
+
+        if (!res.ok) {
+            setActionError(data.error || "Failed to update amount");
+            return;
+        }
+
+        setEditingExpenseId(null);
+        setEditingAmount("");
+
+        await loadAll();
+    };
+
+    const deleteExpense = async (expenseId: string) => {
+        setActionError("");
+
+        if (!confirm("Delete this expense?")) return;
+
+        const res = await fetch(`/api/expenses/${expenseId}`, {
+            method: "DELETE",
+            credentials: "include",
+        });
+
+        const text = await res.text();
+        const data = text ? JSON.parse(text) : {};
+
+        if (!res.ok) {
+            setActionError(data.error || "Failed to delete expense");
+            return;
+        }
+
+        // if we were editing this row, reset
+        if (editingExpenseId === expenseId) {
+            setEditingExpenseId(null);
+            setEditingAmount("");
+        }
+
+        await loadAll();
+    };
 
     if (loading) return <p className="p-6">Loading...</p>;
-    if (!department) return <p>Department not found</p>;
+    if (!department) return <p className="p-6">Department not found</p>;
+
+    const remaining = (budget?.amount ?? 0) - totalExpenses;
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center gap-4">
-                <button onClick={() => router.back()} className="text-sm underline">
-                    ← Back
-                </button>
-                <h1 className="text-3xl font-bold">{department.name}</h1>
-            </div>
+        <div className="min-h-screen bg-gray-50">
+            <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+                {/* Header */}
+                <div className="flex items-center gap-4">
+                    <button onClick={() => router.back()} className="text-sm underline">
+                        ← Back
+                    </button>
+                    <h1 className="text-3xl font-bold">{department.name}</h1>
+                </div>
 
-            {actionError && <p className="text-red-600">{actionError}</p>}
+                {actionError && <p className="text-red-600">{actionError}</p>}
 
-            {/* Budget */}
-            <div className="rounded-xl p-6 text-white bg-gradient-to-r from-blue-500 to-purple-600">
-                <div className="flex justify-between items-start gap-4">
-                    <div>
-                        <h2 className="text-lg font-semibold mb-3">Monthly Budget</h2>
+                {/* Budget Bar */}
+                <div className="rounded-2xl p-6 text-white bg-gradient-to-r from-blue-500 to-purple-600">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                        <div>
+                            <h2 className="text-lg font-semibold mb-3">Monthly Budget</h2>
 
-                        {canEditBudget ? (
-                            <div className="flex gap-2">
-                                <input type="number" className="text-black px-3 py-1 rounded" value={budgetInput} onChange={(e) => setBudgetInput(e.target.value)} />
-                                <button onClick={saveBudget} className="bg-white text-blue-600 px-4 py-1 rounded font-medium">
-                                    Save
-                                </button>
-                            </div>
-                        ) : (
-                            <p className="text-2xl font-bold">RM {budget?.amount ?? 0}</p>
-                        )}
-                    </div>
+                            {canEditBudget ? (
+                                <div className="flex flex-wrap gap-2 items-center">
+                                    <input type="number" className="text-black px-3 py-2 rounded-md w-48" value={budgetInput} onChange={(e) => setBudgetInput(e.target.value)} />
+                                    <button onClick={saveBudget} className="bg-white text-blue-700 px-4 py-2 rounded-md font-medium">
+                                        Save
+                                    </button>
+                                </div>
+                            ) : (
+                                <p className="text-2xl font-bold">RM {rm(budget?.amount ?? 0)}</p>
+                            )}
+                        </div>
 
-                    <div className="text-right">
-                        <p className="text-sm">Total Expenses</p>
-                        <p className="text-2xl font-bold">RM {totalExpenses}</p>
-                        <p className="mt-2 text-sm">
-                            Remaining: <span className="font-bold">RM {(budget?.amount ?? 0) - totalExpenses}</span>
-                        </p>
+                        <div className="text-right">
+                            <p className="text-sm opacity-90">Total Expenses</p>
+                            <p className="text-2xl font-bold">RM {rm(totalExpenses)}</p>
+                            <p className="mt-2 text-sm">
+                                Remaining: <span className="font-bold">RM {rm(remaining)}</span>
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Manage Categories (admin/finance) */}
-            {canManageCategories && (
-                <div className="bg-white rounded-xl shadow p-4 space-y-3">
-                    <h2 className="text-lg font-semibold">Categories</h2>
+                {/* Categories */}
+                {canManageCategories && (
+                    <div className="bg-white rounded-2xl shadow p-4 space-y-3">
+                        <h2 className="text-lg font-semibold">Categories</h2>
 
-                    <div className="flex gap-2">
-                        <input className="border px-3 py-2 rounded w-full" placeholder="New category name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
-                        <button onClick={addCategory} className="bg-black text-white px-4 py-2 rounded">
-                            Add
-                        </button>
-                    </div>
+                        <div className="flex gap-2">
+                            <input className="border px-3 py-2 rounded w-full" placeholder="New category name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
+                            <button onClick={addCategory} className="bg-black text-white px-4 py-2 rounded shrink-0">
+                                Add
+                            </button>
+                        </div>
 
-                    <ul className="space-y-2">
-                        {categories.map((c) => (
-                            <li key={c._id} className="flex justify-between items-center border rounded p-2 gap-2">
-                                {editingCategoryId === c._id ? <input className="border px-2 py-1 rounded w-full" value={editingCategoryName} onChange={(e) => setEditingCategoryName(e.target.value)} autoFocus /> : <span>{c.name}</span>}
+                        <div className="space-y-2">
+                            {categories.map((c) => (
+                                <div key={c._id} className="border rounded-md px-3 py-2 flex items-center gap-2">
+                                    <div className="flex-1">{editingCategoryId === c._id ? <input className="border px-2 py-1 rounded w-full" value={editingCategoryName} onChange={(e) => setEditingCategoryName(e.target.value)} autoFocus /> : <span>{c.name}</span>}</div>
 
-                                {editingCategoryId === c._id ? (
-                                    <div className="flex gap-2">
-                                        <button onClick={() => updateCategory(c._id)} className="text-green-600 underline">
-                                            Save
-                                        </button>
+                                    {editingCategoryId === c._id ? (
+                                        <div className="flex gap-3 text-sm">
+                                            <button onClick={() => updateCategory(c._id)} className="text-green-700 underline">
+                                                Save
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingCategoryId(null);
+                                                    setEditingCategoryName("");
+                                                }}
+                                                className="text-gray-600 underline"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    ) : (
                                         <button
                                             onClick={() => {
-                                                setEditingCategoryId(null);
-                                                setEditingCategoryName("");
+                                                setEditingCategoryId(c._id);
+                                                setEditingCategoryName(c.name);
                                             }}
-                                            className="text-gray-600 underline"
+                                            className="text-blue-600 underline text-sm"
                                         >
-                                            Cancel
+                                            Edit
                                         </button>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={() => {
-                                            setEditingCategoryId(c._id);
-                                            setEditingCategoryName(c.name);
-                                        }}
-                                        className="text-blue-600 underline"
-                                    >
-                                        Edit
-                                    </button>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {/* Add Expense (operator) */}
-            {canAddExpense && (
-                <div className="bg-white rounded-xl shadow p-4 space-y-3">
-                    <h2 className="text-lg font-semibold">Add Expense</h2>
-
-                    <input className="border px-3 py-2 rounded w-full" placeholder="Title" value={expTitle} onChange={(e) => setExpTitle(e.target.value)} />
-
-                    <div className="flex gap-2">
-                        <input type="number" className="border px-3 py-2 rounded w-full" placeholder="Amount" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} />
-
-                        <select className="border px-3 py-2 rounded w-full" value={expCategoryId} onChange={(e) => setExpCategoryId(e.target.value)}>
-                            {categories.map((c) => (
-                                <option key={c._id} value={c._id}>
-                                    {c.name}
-                                </option>
+                                    )}
+                                </div>
                             ))}
-                        </select>
-                    </div>
-
-                    <button onClick={addExpense} className="bg-blue-600 text-white px-4 py-2 rounded">
-                        Submit Expense
-                    </button>
-                </div>
-            )}
-
-            {/* Expenses */}
-            <div className="bg-white rounded-xl shadow divide-y">
-                {Object.keys(groupedExpenses).length === 0 && <p className="p-6 text-gray-500">No expenses yet</p>}
-
-                {Object.entries(groupedExpenses).map(([category, list]) => {
-                    const categoryTotal = list.reduce((s, e) => s + e.amount, 0);
-
-                    return (
-                        <div key={category} className="p-4">
-                            <div className="flex justify-between items-center mb-2">
-                                <h2 className="font-semibold text-lg">
-                                    {category} ({list.length})
-                                </h2>
-                                <span className="font-bold">RM {categoryTotal}</span>
-                            </div>
-
-                            <TableContainer component={Paper} variant="outlined">
-                                <Table size="small" stickyHeader aria-label="expenses table">
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>Title</TableCell>
-                                            <TableCell>By</TableCell>
-                                            <TableCell>Date</TableCell>
-                                            <TableCell align="right">Amount</TableCell>
-                                            <TableCell>Approved By</TableCell>
-                                            <TableCell>Status</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-
-                                    <TableBody>
-                                        {list.map((e) => (
-                                            <TableRow key={e._id} hover>
-                                                <TableCell>{e.title}</TableCell>
-                                                <TableCell>{e.createdBy?.username || "-"}</TableCell>
-                                                <TableCell>{new Date(e.createdAt).toLocaleDateString()}</TableCell>
-                                                <TableCell align="right">RM {e.amount}</TableCell>
-                                                <TableCell>{e.approvedBy?.username || "-"}</TableCell>
-                                                <TableCell sx={{ textTransform: "capitalize" }}>{e.status}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
                         </div>
-                    );
-                })}
+                    </div>
+                )}
+
+                {/* Add Expense */}
+                {canAddExpense && (
+                    <div className="bg-white rounded-2xl shadow p-4 space-y-3">
+                        <h2 className="text-lg font-semibold">Add Expense</h2>
+
+                        <input className="border px-3 py-2 rounded w-full" placeholder="Title" value={expTitle} onChange={(e) => setExpTitle(e.target.value)} />
+
+                        <div className="flex flex-col md:flex-row gap-2">
+                            <input type="number" className="border px-3 py-2 rounded w-full" placeholder="Amount" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} />
+
+                            <select className="border px-3 py-2 rounded w-full" value={expCategoryId} onChange={(e) => setExpCategoryId(e.target.value)}>
+                                {categories.map((c) => (
+                                    <option key={c._id} value={c._id}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <button onClick={addExpense} className="bg-blue-600 text-white px-4 py-2 rounded">
+                            Submit Expense
+                        </button>
+                    </div>
+                )}
+
+                {/* Expenses */}
+                <div className="bg-white rounded-2xl shadow divide-y">
+                    {Object.keys(groupedExpenses).length === 0 && <p className="p-6 text-gray-500">No expenses yet</p>}
+
+                    {Object.entries(groupedExpenses).map(([category, list]) => {
+                        const categoryTotal = list.reduce((s, e) => s + e.amount, 0);
+
+                        return (
+                            <div key={category} className="p-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h2 className="font-semibold text-lg">
+                                        {category} ({list.length})
+                                    </h2>
+                                    <span className="font-bold">RM {rm(categoryTotal)}</span>
+                                </div>
+
+                                <TableContainer
+                                    component={Paper}
+                                    variant="outlined"
+                                    sx={{
+                                        overflowX: "auto", // ✅ prevents squeeze on small screens
+                                        borderRadius: 2,
+                                    }}
+                                >
+                                    <Table
+                                        size="small"
+                                        stickyHeader
+                                        aria-label="expenses table"
+                                        sx={{
+                                            minWidth: 700, // ✅ keeps columns readable
+                                            "& th": { fontWeight: 700 },
+                                        }}
+                                    >
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Title</TableCell>
+                                                <TableCell>By</TableCell>
+                                                <TableCell>Date</TableCell>
+                                                <TableCell align="right">Amount</TableCell>
+                                                <TableCell>Reviewed By</TableCell>
+                                                <TableCell>Status</TableCell>
+                                                <TableCell align="right">Actions</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+
+                                        <TableBody>
+                                            {list.map((e) => (
+                                                <TableRow key={e._id} hover>
+                                                    <TableCell>{e.title}</TableCell>
+                                                    <TableCell>{e.createdBy?.username || "-"}</TableCell>
+                                                    <TableCell>{new Date(e.createdAt).toLocaleDateString()}</TableCell>
+
+                                                    {/* ✅ Amount (editable) */}
+                                                    <TableCell align="right">
+                                                        {editingExpenseId === e._id ? (
+                                                            <div className="flex justify-end items-center gap-2">
+                                                                <span>RM</span>
+                                                                <input type="number" className="border rounded px-2 py-1 w-28 text-right" value={editingAmount} onChange={(ev) => setEditingAmount(ev.target.value)} />
+                                                            </div>
+                                                        ) : (
+                                                            <>RM {rm(e.amount)}</>
+                                                        )}
+                                                    </TableCell>
+
+                                                    <TableCell>{e.approvedBy?.username || "-"}</TableCell>
+                                                    <TableCell sx={{ textTransform: "capitalize" }}>{e.status}</TableCell>
+                                                    <TableCell align="right">
+                                                        {canEditOrDeleteExpense(e) ? (
+                                                            editingExpenseId === e._id ? (
+                                                                <div className="flex justify-end gap-3 text-sm">
+                                                                    <button onClick={() => saveExpenseAmount(e._id)} className="text-green-700 underline">
+                                                                        Save
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingExpenseId(null);
+                                                                            setEditingAmount("");
+                                                                        }}
+                                                                        className="text-gray-600 underline"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex justify-end gap-3 text-sm">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingExpenseId(e._id);
+                                                                            setEditingAmount(String(e.amount));
+                                                                        }}
+                                                                        className="text-blue-600 underline"
+                                                                    >
+                                                                        Edit
+                                                                    </button>
+                                                                    <button onClick={() => deleteExpense(e._id)} className="text-red-600 underline">
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            )
+                                                        ) : (
+                                                            <span className="text-gray-400 text-sm">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );

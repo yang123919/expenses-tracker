@@ -90,6 +90,12 @@ export default function ReportsPage() {
             setLoading(false);
         }
     };
+    const exportExcelServer = () => {
+        if (!departmentId || !month) return;
+
+        const url = `/api/reports/export?department=${departmentId}&month=${month}`;
+        window.location.href = url;
+    };
 
     const approvedTotal = useMemo(() => {
         return expenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
@@ -117,6 +123,9 @@ export default function ReportsPage() {
 
                 <button onClick={loadReport} className="bg-black text-white px-4 py-2 rounded">
                     View Report
+                </button>
+                <button onClick={exportExcelServer} className="bg-green-600 text-white px-4 py-2 rounded" disabled={loading || !departmentId || !month}>
+                    Export Excel
                 </button>
             </div>
 

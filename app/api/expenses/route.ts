@@ -7,7 +7,6 @@ import Category from "@/models/Category";
 import { getTokenUser } from "@/lib/auth";
 import mongoose from "mongoose";
 
-/* --------------------------- POST: create expense -------------------------- */
 export async function POST(req: NextRequest) {
     try {
         await dbConnect();
@@ -54,7 +53,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "No budget set for this department this month" }, { status: 403 });
         }
 
-        // Prevent exceeding budget (ignore rejected)
         const used = await Expense.aggregate([{ $match: { department: departmentId, month, status: { $ne: "rejected" } } }, { $group: { _id: null, total: { $sum: "$amount" } } }]);
 
         const totalUsed = used[0]?.total ?? 0;
@@ -114,8 +112,4 @@ export async function GET(req: NextRequest) {
         console.error(err);
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
-}
-
-export async function PATCH(req: NextRequest){
-
 }

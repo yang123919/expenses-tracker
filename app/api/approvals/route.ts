@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
         const tokenUser = getTokenUser(req);
         if (!tokenUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        // Only finance/admin can access approvals
         if (!["admin", "finance"].includes(tokenUser.role)) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
@@ -21,25 +20,17 @@ export async function GET(req: NextRequest) {
         if (!dbUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const { searchParams } = new URL(req.url);
-        const month = searchParams.get("month") || new Date().toISOString().slice(0, 7); // YYYY-MM
-        const departmentQuery = searchParams.get("department"); // admin can filter
+        const month = searchParams.get("month") || new Date().toISOString().slice(0, 7);
+        const departmentQuery = searchParams.get("department"); // now finance can use too
 
         const match: any = { status: "pending", month };
 
-        // finance: only own department
-        if (dbUser.role === "finance") {
-            if (!dbUser.department_id) {
-                return NextResponse.json({ error: "Finance has no department assigned" }, { status: 400 });
+        // ✅ If department filter exists (admin OR finance), apply it
+        if (departmentQuery) {
+            if (!mongoose.Types.ObjectId.isValid(departmentQuery)) {
+                return NextResponse.json({ error: "Invalid department id" }, { status: 400 });
             }
-            match.department = dbUser.department_id;
-        } else {
-            // admin: optional department filter
-            if (departmentQuery) {
-                if (!mongoose.Types.ObjectId.isValid(departmentQuery)) {
-                    return NextResponse.json({ error: "Invalid department id" }, { status: 400 });
-                }
-                match.department = departmentQuery;
-            }
+            match.department = departmentQuery;
         }
 
         const expenses = await Expense.find(match).populate("department", "_id name").populate("category", "_id name").populate("createdBy", "_id username email").sort({ createdAt: -1 });

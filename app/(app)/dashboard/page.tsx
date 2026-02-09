@@ -29,7 +29,7 @@ export default function DashboardPage() {
     const [departments, setDepartments] = useState<Department[]>([]);
     const [stats, setStats] = useState<Record<string, DeptStats>>({});
 
-    const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const month = new Date().toISOString().slice(0, 7); 
 
     useEffect(() => {
         const stored = localStorage.getItem("user");
@@ -134,6 +134,7 @@ function Card({ title, month, budget, approved, remaining }: { title: string; mo
                     <span className="text-gray-600">Remaining</span>
                     <span className={`font-bold ${remaining >= 0 ? "text-green-600" : "text-red-600"}`}>RM {remaining.toLocaleString()}</span>
                 </div>
+                <p>Click to View</p>
             </div>
         </div>
     );

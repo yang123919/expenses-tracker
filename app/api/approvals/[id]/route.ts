@@ -35,14 +35,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!expense) return NextResponse.json({ error: "Expense not found" }, { status: 404 });
 
         // finance can only approve inside their department
-        if (dbUser.role === "finance") {
-            if (!dbUser.department_id) {
-                return NextResponse.json({ error: "Finance has no department assigned" }, { status: 400 });
-            }
-            if (String(expense.department) !== String(dbUser.department_id)) {
-                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-            }
-        }
+        // if (dbUser.role === "finance") {
+        //     if (!dbUser.department_id) {
+        //         return NextResponse.json({ error: "Finance has no department assigned" }, { status: 400 });
+        //     }
+        //     if (String(expense.department) !== String(dbUser.department_id)) {
+        //         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        //     }
+        // }
 
         // Only pending can be approved/rejected
         if (expense.status !== "pending") {

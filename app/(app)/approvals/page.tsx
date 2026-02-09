@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Role = "admin" | "finance" | "operator";
 
@@ -28,7 +28,7 @@ export default function ApprovalsPage() {
     const [user, setUser] = useState<StoredUser | null>(null);
     const [departments, setDepartments] = useState<Department[]>([]);
     const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-    const [departmentFilter, setDepartmentFilter] = useState(""); // admin only
+    const [departmentFilter, setDepartmentFilter] = useState("");
     const [rows, setRows] = useState<ApprovalExpense[]>([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
@@ -105,7 +105,7 @@ export default function ApprovalsPage() {
 
     const canUsePage = user && (user.role === "admin" || user.role === "finance");
 
-    const pendingCount = useMemo(() => rows.length, [rows]);
+    const pendingCount = rows.length;
 
     if (!user) return <div className="p-6">Loading user...</div>;
 
@@ -126,7 +126,7 @@ export default function ApprovalsPage() {
                     <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="border rounded px-2 py-1" />
                 </div>
 
-                {user.role === "admin" && (
+                {(user.role === "admin" || user.role === "finance") && (
                     <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">Department</span>
                         <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="border rounded px-2 py-1">

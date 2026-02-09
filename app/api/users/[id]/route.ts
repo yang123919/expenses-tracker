@@ -36,7 +36,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         if (user.role === "admin") {
             const admins = await User.countDocuments({ role: "admin" });
             if (admins <= 1) {
-                return NextResponse.json({ error: "Cannot delete last admin" }, { status: 403 });
+                return NextResponse.json({ error: "Cannot delete yourself" }, { status: 403 });
             }
         }
 
